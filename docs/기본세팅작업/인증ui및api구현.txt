@@ -1,0 +1,165 @@
+1. 구조
+
+app/
+ ├── shared/                   # 공용 리소스
+ │   ├── ui/                   # 공용 UI 컴포넌트 (Shadcn/Tailwind)
+ │   │   ├── Button.tsx
+ │   │   ├── Input.tsx
+ │   │   ├── Dialog.tsx
+ │   │   └── Spinner.tsx
+ │   ├── lib/                  # 공용 유틸 + API + Axios 세팅
+ │   │   ├── axios.ts
+ │   │   ├── queryClient.ts
+ │   │   └── api/
+ │   │        └── authApi.ts
+ │   ├── store/                # 글로벌 상태 (Zustand)
+ │   │   ├── useAuthStore.ts
+ │   │   └── useUiStore.ts
+ │   └── types/
+ │        └── auth.d.ts
+ │
+ ├── features/
+ │   ├── auth/
+ │   │   ├── ui/
+ │   │   │   ├── LoginForm.tsx
+ │   │   │   ├── SignupForm.tsx
+ │   │   │   ├── AuthDialog.tsx
+ │   │   │   ├── LoginDialogButton.tsx
+ │   │   │   ├── SignupDialogButton.tsx
+ │   │   │   └── LogoutButton.tsx
+ │   │   ├── model/
+ │   │   │   ├── useLoginMutation.ts
+ │   │   │   ├── useSignupMutation.ts
+ │   │   │   ├── useAuthValidationQuery.ts
+ │   │   │   └── index.ts
+ │   │   └── index.ts
+ │
+ ├── widgets/
+ │   ├── Header/
+ │   │   ├── Header.tsx
+ │   │   └── AuthMenuForHeader.tsx
+ │   └── Footer/
+ │        └── Footer.tsx
+ │
+ ├── app/
+ │   ├── login/page.tsx
+ │   ├── signup/page.tsx
+ │   ├── dashboard/page.tsx
+ │   ├── layout.tsx
+ │   ├── globals.css
+ │   └── page.tsx
+ │
+ ├── docs/
+ │   └── 기본세팅작업/
+ └── ...
+
+
+🪜 3️⃣ 구현 순서 (전체 절차 로드맵)
+① 공용 설정
+
+/shared/lib/axios.ts
+→ axios 인스턴스 생성, interceptor로 accessToken 자동 첨부
+
+/shared/lib/queryClient.ts
+→ react-query client 생성
+
+/shared/store/useAuthStore.ts
+→ user/token 상태 persist
+
+/shared/ui/
+→ Button, Input, Dialog, Spinner 등 기본 컴포넌트
+
+② Auth API (백엔드 연동)
+
+/shared/lib/api/authApi.ts
+
+apiForLogin(email, password)
+
+apiForSignup(email, password, name)
+
+apiForGetProfile()
+
+③ TanStack Query Hooks (features/auth/model/)
+Hook	역할
+useLoginMutation.ts	로그인 POST 요청 + Zustand 상태 업데이트
+useSignupMutation.ts	회원가입 POST 요청
+useAuthValidationQuery.ts	JWT 유효성 검사 (자동 로그인 유지)
+④ Zustand Auth Store
+상태	설명
+user	로그인된 사용자 정보
+accessToken	JWT 토큰
+isAuthenticated	로그인 여부
+login()	로그인 시 상태 저장
+logout()	로그아웃 시 상태 초기화
+⑤ Auth UI (features/auth/ui/)
+컴포넌트	설명
+LoginForm.tsx	로그인 폼 (react-hook-form + mutation)
+SignupForm.tsx	회원가입 폼
+AuthDialog.tsx	로그인 ↔ 회원가입 전환 가능한 다이얼로그
+LoginDialogButton.tsx	Header에서 로그인 다이얼로그 호출 버튼
+SignupDialogButton.tsx	Header에서 회원가입 다이얼로그 호출 버튼
+LogoutButton.tsx	로그인 시 표시되는 로그아웃 버튼
+⑥ Header 통합 (widgets/Header/)
+파일명	설명
+Header.tsx	공통 상단 네비게이션
+AuthMenuForHeader.tsx	로그인 상태에 따라 버튼/프로필 전환
+
+로그인 X → LoginDialogButton, SignupDialogButton
+
+로그인 O → 이메일 + LogoutButton
+
+⑦ 페이지 구성 (app/)
+페이지	내용
+/login/page.tsx	단독 로그인 페이지 (폼 직접 삽입)
+/signup/page.tsx	단독 회원가입 페이지
+/dashboard/page.tsx	로그인된 유저 전용 페이지
+/layout.tsx	<Header /> + <QueryClientProvider> + Zustand Provider
+⑧ 인증 플로우 요약
+단계	동작	관련 로직
+1	로그인 시 API 호출 → JWT 발급	useLoginMutation
+2	성공 시 useAuthStore.login() 저장	Zustand persist
+3	새로고침 시 /api/auth/me 요청	useAuthValidationQuery
+4	유효하면 자동 로그인 유지	Zustand 갱신
+5	토큰 만료 시 interceptor 로그아웃	axios interceptor
+6	헤더 메뉴 실시간 반영	AuthMenuForHeader
+7	로그아웃 시 전역 상태 초기화	useAuthStore.logout()
+⑨ 확장 고려
+기능	설명	위치
+✅ Refresh Token 자동 갱신	Axios interceptor에서 처리	/shared/lib/axios.ts
+✅ 로그인 후 redirect	Next.js router.replace()	/features/auth/model/useLoginMutation.ts
+✅ 관리자 Role 구분	user.role 상태	/shared/store/useAuthStore.ts
+✅ Protected Route	middleware.ts or client-side guard	/app/dashboard/page.tsx
+🧩 4️⃣ 이름 요약 표
+구분	파일 / 훅 / 컴포넌트명
+Zustand Store	useAuthStore
+API	authApi.ts
+Query Client	queryClient.ts
+Query Hook	useLoginMutation, useSignupMutation, useAuthValidationQuery
+Form	LoginForm, SignupForm
+Dialog	AuthDialog
+Header Menu	AuthMenuForHeader
+Provider	AppProviders or directly in layout.tsx
+🚀 구현 플로우 간단 요약
+
+1️⃣ 기반 세팅 → Zustand, TanStack Query, axios, persist
+2️⃣ Auth API → login/signup/profile
+3️⃣ Mutation/Query 훅 구성
+4️⃣ Form + Dialog UI 제작
+5️⃣ Header 연동 (AuthMenuForHeader)
+6️⃣ 토큰 검증 + 자동 로그인 유지
+7️⃣ Redirect, Role 분기, Protected Page 확장
+
+
+그외 참고:
+
+🧩 AuthSectionForHeader
+
+의미
+
+헤더 우측 상단에서 로그인 상태에 따라
+로그인 폼 / 회원가입 버튼 / 프로필 메뉴 등을 자동으로 전환해서 보여주는 인증 전용 섹션 컴포넌트.
+
+widgets/
+ └── Header/
+      ├── Header.tsx
+      └── AuthSectionForHeader.tsx
